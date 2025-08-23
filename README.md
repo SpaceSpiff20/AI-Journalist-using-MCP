@@ -66,7 +66,7 @@ This project leverages MCP (Model Context Protocol), LangGraph, and FastAPI + St
 
 - Others: LangGraph, Tenacity, AsyncLimiter, BeautifulSoup
 
-##📂 Project Structure
+## 📂 Project Structure
 ```
 AI-Journalist-using-MCP/
 │── backend.py         # FastAPI backend (serves audio API)
