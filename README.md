@@ -4,7 +4,9 @@ An AI-powered digital journalist that scrapes news and Reddit discussions, analy
 
 This project leverages MCP (Model Context Protocol), LangGraph, and FastAPI + Streamlit to deliver a seamless end-to-end pipeline:
  👉 Collects live news & Reddit content
+ 
  👉 Summarizes into broadcast-style scripts
+ 
  👉 Converts to realistic voice audio
 
 ## 🚀 Features
