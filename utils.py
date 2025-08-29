@@ -10,6 +10,9 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 from datetime import datetime
 from elevenlabs import ElevenLabs
+from speechify import Speechify
+from speechify.tts import GetSpeechOptionsRequest
+import base64
 
 load_dotenv()
 
@@ -301,3 +304,141 @@ def tts_to_audio(text: str, language: str = 'en') -> str:
     except Exception as e:
         print(f"gTTS Error: {str(e)}")
         return None
+
+
+def text_to_audio_speechify(
+    text: str,
+    voice_id: str = "scott",
+    model: str = "simba-english",
+    audio_format: str = "mp3",
+    language: str = "en-US",
+    output_dir: str = "audio",
+    api_key: str = None,
+    loudness_normalization: bool = True,
+    text_normalization: bool = True
+) -> str:
+    """
+    Converts text to speech using Speechify API and saves it to audio/ directory.
+    
+    Args:
+        text: Input text to convert to speech
+        voice_id: Speechify voice ID (default: "scott")
+        model: TTS model to use ("simba-english" or "simba-multilingual")
+        audio_format: Audio format ("aac", "mp3", "ogg", "wav")
+        language: Language code (e.g., "en-US", "fr-FR")
+        output_dir: Directory to save audio files
+        api_key: Speechify API key (uses env var SPEECHIFY_API_KEY if not provided)
+        loudness_normalization: Enable loudness normalization
+        text_normalization: Enable text normalization
+    
+    Returns:
+        str: Path to the saved audio file
+    
+    Raises:
+        ValueError: If API key is missing
+        Exception: For other API errors
+    """
+    try:
+        api_key = api_key or os.getenv("SPEECHIFY_API_KEY")
+        if not api_key:
+            raise ValueError("Speechify API key is required. Set SPEECHIFY_API_KEY environment variable.")
+
+        # Initialize Speechify client
+        client = Speechify(token=api_key)
+        
+        # Create options for advanced TTS features
+        options = GetSpeechOptionsRequest(
+            loudness_normalization=loudness_normalization,
+            text_normalization=text_normalization
+        )
+
+        # Generate speech
+        audio_response = client.tts.audio.speech(
+            audio_format=audio_format,
+            input=text,
+            language=language,
+            model=model,
+            options=options,
+            voice_id=voice_id
+        )
+
+        # Decode base64 audio data
+        audio_bytes = base64.b64decode(audio_response.audio_data)
+
+        # Ensure output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Generate unique filename
+        filename = f"speechify_tts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{audio_format}"
+        filepath = os.path.join(output_dir, filename)
+
+        # Write audio to file
+        with open(filepath, "wb") as f:
+            f.write(audio_bytes)
+
+        return filepath
+
+    except Exception as e:
+        raise e
+
+
+def get_speechify_voices(api_key: str = None):
+    """
+    Get available Speechify voices for filtering and selection.
+    
+    Args:
+        api_key: Speechify API key (uses env var SPEECHIFY_API_KEY if not provided)
+    
+    Returns:
+        list: List of available voice objects
+    """
+    try:
+        api_key = api_key or os.getenv("SPEECHIFY_API_KEY")
+        if not api_key:
+            raise ValueError("Speechify API key is required. Set SPEECHIFY_API_KEY environment variable.")
+
+        client = Speechify(token=api_key)
+        return client.tts.voices.list()
+    except Exception as e:
+        raise e
+
+
+def filter_voice_models(voices, *, gender=None, locale=None, tags=None):
+    """
+    Filter Speechify voices by gender, locale, and/or tags,
+    and return the list of model IDs for matching voices.
+
+    Args:
+        voices (list): List of GetVoice objects.
+        gender (str, optional): e.g. 'male', 'female'.
+        locale (str, optional): e.g. 'en-US'.
+        tags (list, optional): list of tags, e.g. ['timbre:deep'].
+
+    Returns:
+        list[str]: IDs of matching voice models.
+    """
+    results = []
+
+    for voice in voices:
+        # gender filter
+        if gender and voice.gender.lower() != gender.lower():
+            continue
+
+        # locale filter (check across models and languages)
+        if locale:
+            if not any(
+                any(lang.locale == locale for lang in model.languages)
+                for model in voice.models
+            ):
+                continue
+
+        # tags filter
+        if tags:
+            if not all(tag in voice.tags for tag in tags):
+                continue
+
+        # If we got here, the voice matches -> collect model ids
+        for model in voice.models:
+            results.append(model.name)
+
+    return results
