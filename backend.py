@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from models import NewsRequest
-from utils import generate_broadcast_news, text_to_audio_elevenlabs_sdk, tts_to_audio
+from utils import generate_broadcast_news, text_to_audio_elevenlabs_sdk, tts_to_audio, text_to_audio_speechify
 from news_scraper import NewsScraper
 from reddit_scraper import scrape_reddit_topics
 
@@ -34,13 +34,26 @@ async def generate_news_audio(request: NewsRequest):
             topics=request.topics
         )
 
-        audio_path = text_to_audio_elevenlabs_sdk(
-            text=news_summary,
-            voice_id="JBFqnCBsd6RMkjVDRZzb",
-            model_id="eleven_multilingual_v2",
-            output_format="mp3_44100_128",
-            output_dir="audio"
-        )
+        # Try Speechify first, fallback to ElevenLabs if Speechify API key is not available
+        try:
+            audio_path = text_to_audio_speechify(
+                text=news_summary,
+                voice_id="scott",
+                model="simba-english",
+                audio_format="mp3",
+                language="en-US",
+                output_dir="audio"
+            )
+        except (ValueError, Exception) as e:
+            # Fallback to ElevenLabs if Speechify fails
+            print(f"Speechify TTS failed, falling back to ElevenLabs: {str(e)}")
+            audio_path = text_to_audio_elevenlabs_sdk(
+                text=news_summary,
+                voice_id="JBFqnCBsd6RMkjVDRZzb",
+                model_id="eleven_multilingual_v2",
+                output_format="mp3_44100_128",
+                output_dir="audio"
+            )
 
         if audio_path and Path(audio_path).exists():
             with open(audio_path, "rb") as f:
